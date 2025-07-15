@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+yfinance
+fastapi-mail
+apscheduler
+python-multipart
+pydantic
