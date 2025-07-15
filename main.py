@@ -3,12 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 from apscheduler.schedulers.background import BackgroundScheduler
 import yfinance as yf
-from pydantic import BaseModel
 import os
+from pydantic import BaseModel
 
 app = FastAPI()
 
-# CORS für Frontend-Zugriff
+# CORS aktivieren für Browserzugriff
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,7 +17,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mail-Konfiguration (aus Umgebungsvariablen)
+# Mail-Konfiguration (über Render Umgebungsvariablen)
 conf = ConnectionConfig(
     MAIL_USERNAME=os.environ.get("EMAIL_USER"),
     MAIL_PASSWORD=os.environ.get("EMAIL_PASS"),
@@ -30,30 +30,33 @@ conf = ConnectionConfig(
 )
 fm = FastMail(conf)
 
-# Tickers – initial festgelegt
+# Anfangsliste der beobachteten Aktien
 tracked_tickers = [
     "TKA.DE",       # ThyssenKrupp
-    "CSPX.L",       # Amundi S&P 500 (Börse London)
+    "CSPX.L",       # Amundi S&P 500
     "HMWO.L",       # HSBC MSCI World
     "JNJ",          # Johnson & Johnson
     "NVDA", "AAPL", "TSLA", "AMZN", "META", "PLTR"
 ]
 
+# Modell für neue Ticker (Frontend-POST)
 class AddTicker(BaseModel):
     ticker: str
 
 @app.post("/add")
 def add_ticker(t: AddTicker):
-    if t.ticker.upper() not in tracked_tickers:
-        tracked_tickers.append(t.ticker.upper())
-        return {"message": f"{t.ticker} wurde zur Überwachung hinzugefügt."}
-    return {"message": f"{t.ticker} wird bereits überwacht."}
+    ticker = t.ticker.upper()
+    if ticker not in tracked_tickers:
+        tracked_tickers.append(ticker)
+        return {"message": f"{ticker} wurde zur Überwachung hinzugefügt."}
+    return {"message": f"{ticker} wird bereits überwacht."}
 
+# Signalprüfung für alle Aktien
 def check_signals():
     for ticker in tracked_tickers:
         try:
-            df = yf.download(ticker, period="1mo", interval="1d")
-            close = df["Close"]
+            data = yf.download(ticker, period="1mo", interval="1d")
+            close = data["Close"]
             sma5 = close.rolling(window=5).mean()
             sma20 = close.rolling(window=20).mean()
 
@@ -70,6 +73,7 @@ def check_signals():
         except Exception as e:
             print(f"Fehler bei {ticker}: {e}")
 
+# E-Mail-Versand bei Signal
 def send_email(ticker, price, signal):
     message = MessageSchema(
         subject=f"{signal}-Signal für {ticker}",
@@ -79,20 +83,20 @@ def send_email(ticker, price, signal):
     )
     fm.send_message(message)
 
-# Starte automatischen Scheduler alle 10 Minuten
+# Scheduler starten (alle 10 Minuten)
 scheduler = BackgroundScheduler()
 scheduler.add_job(check_signals, "interval", minutes=10)
 scheduler.start()
 
 @app.get("/")
 def root():
-    return {"status": "Aktien-App läuft ✅", "überwachte Aktien": tracked_tickers}
+    return {"status": "App läuft ✅", "überwachte Aktien": tracked_tickers}
 
 @app.get("/signal/{ticker}")
-def manual_check(ticker: str, background_tasks: BackgroundTasks):
+def check_single(ticker: str, background_tasks: BackgroundTasks):
     try:
-        df = yf.download(ticker, period="1mo", interval="1d")
-        close = df["Close"]
+        data = yf.download(ticker, period="1mo", interval="1d")
+        close = data["Close"]
         sma5 = close.rolling(window=5).mean()
         sma20 = close.rolling(window=20).mean()
 
