@@ -15,18 +15,22 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-)
-
-# Mail-Konfiguration (über Render Umgebungsvariablen)
+    
+    
+    
 conf = ConnectionConfig(
     MAIL_USERNAME=os.environ.get("EMAIL_USER"),
     MAIL_PASSWORD=os.environ.get("EMAIL_PASS"),
     MAIL_FROM=os.environ.get("EMAIL_USER"),
     MAIL_PORT=int(os.environ.get("SMTP_PORT")),
     MAIL_SERVER=os.environ.get("SMTP_SERVER"),
-    MAIL_TLS=True,
-    MAIL_SSL=False,
+    MAIL_STARTTLS=True,
+    MAIL_SSL_TLS=False,
     USE_CREDENTIALS=True
+
+
+# Mail-Konfiguration (über Render Umgebungsvariablen)
+
 )
 fm = FastMail(conf)
 
