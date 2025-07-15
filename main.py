@@ -99,6 +99,7 @@ scheduler.start()
 def root():
     return {"status": "App läuft ✅", "überwachte Aktien": tracked_tickers}
 
+
 @app.get("/signal/{ticker}")
 def check_single(ticker: str, background_tasks: BackgroundTasks):
     try:
