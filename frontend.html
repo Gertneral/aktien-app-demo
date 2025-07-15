@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Aktienkurse online im Überblick</title>
+  <style>
+    body { background: #000; color: #fff; font-family: Arial, sans-serif; padding: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { padding: 10px; border-bottom: 1px solid #333; text-align: left; }
+    .pos { color: #4da6ff; }  /* Blau für positiv */
+    .neg { color: #ff4d4d; }  /* Rot für negativ */
+    #addBtn { background: red; color: #fff; border: none; padding: 10px 15px;
+              font-size: 16px; cursor: pointer; border-radius: 5px; }
+    #inputTicker { padding: 8px; font-size: 16px; margin-right: 10px; width: 120px; }
+  </style>
+</head>
+<body>
+
+  <h1>Aktienkurse online im Überblick</h1>
+  <div>
+    <input id="inputTicker" type="text" placeholder="z. B. TSLA">
+    <button id="addBtn">➕ Aktie hinzufügen</button>
+  </div>
+
+  <table id="stockTable">
+    <thead>
+      <tr><th>Ticker</th><th>Preis</th><th>Signal</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    const apiUrl = window.location.origin;
+    let tickers = [];
+
+    async function loadTickers() {
+      const res = await fetch(`${apiUrl}/`);
+      const data = await res.json();
+      tickers = data['überwachte Aktien'];
+      updateTable();
+    }
+
+    async function updateTable() {
+      const tbody = document.querySelector('#stockTable tbody');
+      tbody.innerHTML = '';
+      for (const t of tickers) {
+        const res = await fetch(`${apiUrl}/signal/${t}`);
+        const json = await res.json();
+        const row = document.createElement('tr');
+        const change = json.signal === 'KAUFEN' ? '<span class="pos">▲</span>'
+                     : json.signal === 'VERKAUFEN' ? '<span class="neg">▼</span>'
+                     : '';
+        row.innerHTML = `<td>${t}</td><td>${json.preis.toFixed(2)}</td><td>${json.signal} ${change}</td>`;
+        tbody.appendChild(row);
+      }
+    }
+
+    document.getElementById('addBtn').addEventListener('click', async () => {
+      const ticker = document.getElementById('inputTicker').value.trim().toUpperCase();
+      if (ticker) {
+        await fetch(`${apiUrl}/add`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ticker})
+        });
+        document.getElementById('inputTicker').value = '';
+        loadTickers();
+      }
+    });
+
+    window.onload = loadTickers;
+    setInterval(loadTickers, 600000);  // Alle 10 Minuten neu laden
+  </script>
+</body>
+</html>
