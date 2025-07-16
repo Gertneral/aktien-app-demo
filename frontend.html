@@ -4,14 +4,51 @@
   <meta charset="UTF-8">
   <title>Aktienkurse online im Überblick</title>
   <style>
-    body { background: #000; color: #fff; font-family: Arial, sans-serif; padding: 20px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th, td { padding: 10px; border-bottom: 1px solid #333; text-align: left; }
-    .pos { color: #4da6ff; }  /* Blau für positiv */
-    .neg { color: #ff4d4d; }  /* Rot für negativ */
-    #addBtn { background: red; color: #fff; border: none; padding: 10px 15px;
-              font-size: 16px; cursor: pointer; border-radius: 5px; }
-    #inputTicker { padding: 8px; font-size: 16px; margin-right: 10px; width: 120px; }
+    body {
+      background: #000;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid #333;
+      text-align: left;
+    }
+    .pos {
+      color: #4da6ff;
+    }
+    .neg {
+      color: #ff4d4d;
+    }
+    #addBtn {
+      background: red;
+      color: #fff;
+      border: none;
+      padding: 10px 15px;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+    #inputTicker {
+      padding: 8px;
+      font-size: 16px;
+      margin-right: 10px;
+      width: 120px;
+    }
+    .removeBtn {
+      background: red;
+      color: white;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -24,7 +61,7 @@
 
   <table id="stockTable">
     <thead>
-      <tr><th>Ticker</th><th>Preis</th><th>Signal</th></tr>
+      <tr><th>Ticker</th><th>Preis</th><th>Signal</th><th>Aktion</th></tr>
     </thead>
     <tbody></tbody>
   </table>
@@ -44,32 +81,51 @@
       const tbody = document.querySelector('#stockTable tbody');
       tbody.innerHTML = '';
       for (const t of tickers) {
-        const res = await fetch(`${apiUrl}/signal/${t}`);
-        const json = await res.json();
-        const row = document.createElement('tr');
-        const change = json.signal === 'KAUFEN' ? '<span class="pos">▲</span>'
-                     : json.signal === 'VERKAUFEN' ? '<span class="neg">▼</span>'
-                     : '';
-        row.innerHTML = `<td>${t}</td><td>${json.preis.toFixed(2)}</td><td>${json.signal} ${change}</td>`;
-        tbody.appendChild(row);
+        try {
+          const res = await fetch(`${apiUrl}/signal/${t}`);
+          const json = await res.json();
+          const row = document.createElement('tr');
+          const change = json.signal === 'KAUFEN' ? '<span class="pos">▲</span>'
+                       : json.signal === 'VERKAUFEN' ? '<span class="neg">▼</span>'
+                       : '';
+          row.innerHTML = `
+            <td>${t}</td>
+            <td>${json.preis ? json.preis.toFixed(2) : "0.00"}</td>
+            <td>${json.signal} ${change}</td>
+            <td><button onclick="removeRow(this)" class="removeBtn">❌</button></td>
+          `;
+          tbody.appendChild(row);
+        } catch (err) {
+          console.error("Fehler beim Abrufen:", t, err);
+        }
       }
     }
 
     document.getElementById('addBtn').addEventListener('click', async () => {
-      const ticker = document.getElementById('inputTicker').value.trim().toUpperCase();
-      if (ticker) {
-        await fetch(`${apiUrl}/add`, {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ticker})
-        });
-        document.getElementById('inputTicker').value = '';
-        loadTickers();
+      const input = document.getElementById('inputTicker');
+      const ticker = input.value.trim().toUpperCase();
+      if (ticker && !tickers.includes(ticker)) {
+        try {
+          await fetch(`${apiUrl}/add`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ticker})
+          });
+          input.value = '';
+          loadTickers();
+        } catch (err) {
+          alert("Fehler beim Hinzufügen.");
+        }
       }
     });
 
+    function removeRow(btn) {
+      const row = btn.closest('tr');
+      row.remove();
+    }
+
     window.onload = loadTickers;
-    setInterval(loadTickers, 600000);  // Alle 10 Minuten neu laden
+    setInterval(loadTickers, 600000);  // alle 10 Minuten neu laden
   </script>
 </body>
 </html>
