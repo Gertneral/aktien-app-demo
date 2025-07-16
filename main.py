@@ -122,3 +122,12 @@ def check_single(ticker: str, background_tasks: BackgroundTasks):
 
     except Exception as e:
         return {"error": str(e)}
+
+from fastapi.responses import FileResponse
+import os
+
+@app.get("/frontend.html")
+def serve_frontend():
+    path = os.path.join(os.path.dirname(__file__), "frontend.html")
+    return FileResponse(path, media_type='text/html')
+
