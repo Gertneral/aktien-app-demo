@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Aktienkurse online im Überblick</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
       background: #000;
@@ -19,13 +20,10 @@
       padding: 10px;
       border-bottom: 1px solid #333;
       text-align: left;
+      cursor: pointer;
     }
-    .pos {
-      color: #4da6ff;
-    }
-    .neg {
-      color: #ff4d4d;
-    }
+    .pos { color: #4da6ff; }
+    .neg { color: #ff4d4d; }
     #addBtn {
       background: red;
       color: #fff;
@@ -49,6 +47,30 @@
       border-radius: 4px;
       cursor: pointer;
     }
+    #chartModal {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.9);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+    #chartModal canvas {
+      background: #111;
+      padding: 20px;
+      border-radius: 10px;
+    }
+    #closeModal {
+      margin-top: 20px;
+      background: #444;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -65,6 +87,11 @@
     </thead>
     <tbody></tbody>
   </table>
+
+  <div id="chartModal">
+    <canvas id="stockChart" width="600" height="400"></canvas>
+    <button id="closeModal">Schließen</button>
+  </div>
 
   <script>
     const apiUrl = window.location.origin;
@@ -85,18 +112,18 @@
           const res = await fetch(`${apiUrl}/signal/${t}`);
           const json = await res.json();
           const row = document.createElement('tr');
-          const change = json.signal === 'KAUFEN' ? '<span class="pos">▲</span>'
-                       : json.signal === 'VERKAUFEN' ? '<span class="neg">▼</span>'
-                       : '';
+          const change = json.signal === 'KAUFEN' ? '<span class="pos">▲</span>' :
+                         json.signal === 'VERKAUFEN' ? '<span class="neg">▼</span>' : '';
           row.innerHTML = `
-            <td>${t}</td>
+            <td class="ticker">${t}</td>
             <td>${json.preis ? json.preis.toFixed(2) : "0.00"}</td>
             <td>${json.signal} ${change}</td>
             <td><button onclick="removeRow(this)" class="removeBtn">❌</button></td>
           `;
+          row.querySelector('.ticker').addEventListener('click', () => showChart(t));
           tbody.appendChild(row);
         } catch (err) {
-          console.error("Fehler beim Abrufen:", t, err);
+          console.error("Fehler bei Ticker:", t, err);
         }
       }
     }
@@ -109,7 +136,7 @@
           await fetch(`${apiUrl}/add`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ticker})
+            body: JSON.stringify({ ticker })
           });
           input.value = '';
           loadTickers();
@@ -124,8 +151,53 @@
       row.remove();
     }
 
+    async function showChart(ticker) {
+      const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=5d&interval=1d`);
+      const json = await res.json();
+      const prices = json.chart.result[0].indicators.quote[0].close;
+      const timestamps = json.chart.result[0].timestamp;
+
+      const labels = timestamps.map(ts => new Date(ts * 1000).toLocaleDateString());
+      const ctx = document.getElementById('stockChart').getContext('2d');
+
+      if (window.chartInstance) window.chartInstance.destroy();
+
+      window.chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: `Kursverlauf ${ticker}`,
+            data: prices,
+            borderColor: '#4da6ff',
+            backgroundColor: 'rgba(77, 166, 255, 0.2)',
+            tension: 0.2,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: false,
+          scales: {
+            x: { ticks: { color: '#fff' } },
+            y: { ticks: { color: '#fff' } }
+          },
+          plugins: {
+            legend: { labels: { color: '#fff' } }
+          }
+        }
+      });
+
+      document.getElementById('chartModal').style.display = 'flex';
+    }
+
+    document.getElementById('closeModal').addEventListener('click', () => {
+      document.getElementById('chartModal').style.display = 'none';
+    });
+
     window.onload = loadTickers;
-    setInterval(loadTickers, 600000);  // alle 10 Minuten neu laden
+    setInterval(loadTickers, 600000);
   </script>
 </body>
 </html>
+
+ 
