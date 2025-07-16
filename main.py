@@ -99,29 +99,29 @@ scheduler.start()
 def root():
     return {"status": "App läuft ✅", "überwachte Aktien": tracked_tickers}
 
-
 @app.get("/signal/{ticker}")
-def check_single(ticker: str, background_tasks: BackgroundTasks):
+def aktien_signal(ticker: str):
     try:
-        data = yf.download(ticker, period="1mo", interval="1d")
-        close = data["Close"]
-        sma5 = close.rolling(window=5).mean()
-        sma20 = close.rolling(window=20).mean()
+        data = yf.Ticker(ticker).history(period="5d")
+        if data.empty:
+            return {"ticker": ticker, "signal": "Keine Daten", "preis": 0.0}
 
-        if sma5.iloc[-1] > sma20.iloc[-1]:
+        preis = data["Close"].iloc[-1]  # letzter Schlusskurs
+        ma5 = data["Close"].rolling(window=5).mean().iloc[-1]  # gleitender Durchschnitt
+
+        if float(preis) > float(ma5):
             signal = "KAUFEN"
-        elif sma5.iloc[-1] < sma20.iloc[-1]:
+        elif float(preis) < float(ma5):
             signal = "VERKAUFEN"
         else:
             signal = "HALTEN"
 
-        if signal != "HALTEN":
-            background_tasks.add_task(send_email, ticker, close.iloc[-1], signal)
-
-        return {"signal": signal, "preis": close.iloc[-1]}
+        return {"ticker": ticker, "signal": signal, "preis": round(preis, 2)}
 
     except Exception as e:
-        return {"error": str(e)}
+        return {"ticker": ticker, "signal": "Fehler", "error": str(e), "preis": 0.0}
+
+
 
 from fastapi.responses import FileResponse
 import os
